@@ -68,11 +68,11 @@ type ant struct {
 }
 
 func (a *ant) String() string {
-	return fmt.Sprintf("row: %d, column: %d and pointed: %s", a.r, a.c, a.dir)
+	return fmt.Sprintf("row: %d, column: %d and pointed %s", a.r, a.c, a.dir)
 }
 
-func (a *ant) applyGridAction(nextDir direction, steps int) {
-	log.Debugf("applying grid action to ant %s with next direction %s and steps %d", a, nextDir, steps)
+func (a *ant) move(nextDir direction, steps int) {
+	log.Debugf("moving ant at %s to direction %s and %d steps", a, nextDir, steps)
 
 	action, present := gridActionReference[directionChange{a.dir, nextDir}]
 	if !present {
@@ -93,17 +93,6 @@ func (a *ant) applyGridAction(nextDir direction, steps int) {
 	}
 
 	a.dir = action.dir
-}
-
-func (a *ant) move(currCell bool, steps int) {
-	// At a black square, turn 90° left, flip the color of the square, move forward one unit
-	if currCell {
-		a.applyGridAction(dirLeft, steps)
-		return
-	}
-
-	// At a white square, turn 90° right, flip the color of the square, move forward one unit
-	a.applyGridAction(dirRight, steps)
 }
 
 type grid [][]bool
@@ -134,32 +123,93 @@ func (g grid) String() string {
 
 var outOfBounds = false
 
-func (g grid) iterate(a *ant) {
+func (g grid) addColumnOnLeft() grid {
+	gg := make(grid, len(g))
+	for r, _ := range gg {
+		gg[r] = append([]bool{false}, g[r]...)
+	}
+
+	return gg
+}
+
+func (g grid) addRowOnTop() grid {
+	gg := make(grid, len(g)+1)
+	gg[0] = make([]bool, len(g[0]))
+	for r, _ := range g {
+		gg[r+1] = g[r]
+	}
+
+	return gg
+}
+
+func (g grid) addColumnOnRight() grid {
+	gg := make(grid, len(g))
+	for r, _ := range gg {
+		gg[r] = append(g[r], false)
+	}
+
+	return gg
+}
+
+func (g grid) addRowOnBottom() grid {
+	gg := make(grid, len(g)+1)
+	for r, _ := range g {
+		gg[r] = g[r]
+	}
+	gg[len(gg)-1] = make([]bool, len(gg[0]))
+
+	return gg
+}
+
+func (g grid) iterate(a *ant) grid {
 	currIteration++
 
+	log.Debugf("grid size: rows: %d, cols: %d", len(g), len(g[0]))
 	log.Debugf("running iteration %d", currIteration)
 	if currIteration == *iterations || outOfBounds {
-		return
+		return g
 	}
 
 	oldR, oldC := a.r, a.c
 
-	a.move(g[a.r][a.c], 1)
-	if a.c >= len(g[0]) || a.r >= len(g) || a.c < 0 || a.r < 0 {
-		outOfBounds = true
-		log.Debugln("ant going out of bounds")
-		return
+	// At a black square, turn 90° left, flip the color of the square, move forward one unit
+	if g[a.r][a.c] {
+		a.move(dirLeft, 1)
+	} else {
+		// At a white square, turn 90° right, flip the color of the square, move forward one unit
+		a.move(dirRight, 1)
+	}
+	log.Debugf("ant new position is at %s", a)
+
+	switch {
+	case a.c < 0:
+		log.Debugf("adding column on left")
+		a.c = 0
+		g = g.addColumnOnLeft()
+
+	case a.r < 0:
+		a.r = 0
+		log.Debugf("adding row on top")
+		g = g.addRowOnTop()
+
+	case a.c >= len(g[0]):
+		log.Debugf("adding column on right")
+		g = g.addColumnOnRight()
+
+	case a.r >= len(g):
+		log.Debugf("adding row on bottom")
+		g = g.addRowOnBottom()
 	}
 
-	log.Debugf("Flipping cell at row %d col %d", oldR, oldC)
+	log.Debugf("flipping cell at row %d col %d", oldR, oldC)
 	g[oldR][oldC] = !g[oldR][oldC]
 
-	log.Debugf("%s\n", a)
-	g.iterate(a)
+	log.Debugf("ant at %s\n", a)
+	return g.iterate(a)
 }
 
 var (
-	gridSize   = flag.Int("s", 10, "size of the grid")
+	gridSize   = flag.Int("s", 10, "initial size of grid")
 	iterations = flag.Int("n", 10, "number of iterations to run")
 	logLevel   = flag.String("v", "info", "debug level <info|debug|fatal>")
 
@@ -194,9 +244,9 @@ func main() {
 	}
 
 	a := ant{dir: dirUp, r: *gridSize / 2, c: *gridSize / 2}
-	log.Infof("Ant starting at %s", a)
+	log.Infof("ant starting at %s", &a)
 
-	g.iterate(&a)
+	g = g.iterate(&a)
 
 	fmt.Printf("End grid: \n%s", g)
 }
