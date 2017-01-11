@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -134,18 +132,21 @@ func (g grid) String() string {
 	return buf.String()
 }
 
+var outOfBounds = false
+
 func (g grid) iterate(a *ant) {
 	currIteration++
 
 	log.Debugf("running iteration %d", currIteration)
-	if currIteration == *iterations {
+	if currIteration == *iterations || outOfBounds {
 		return
 	}
 
 	oldR, oldC := a.r, a.c
 
 	a.move(g[a.r][a.c], 1)
-	if a.c >= *gridSize || a.r >= *gridSize {
+	if a.c >= len(g[0]) || a.r >= len(g) || a.c < 0 || a.r < 0 {
+		outOfBounds = true
 		log.Debugln("ant going out of bounds")
 		return
 	}
@@ -188,16 +189,13 @@ func main() {
 	log.Infof("Grid size: %d", *gridSize)
 
 	g := make(grid, *gridSize)
-
 	for i, _ := range g {
 		g[i] = make([]bool, *gridSize)
 	}
 
-	rand.Seed(time.Now().Unix())
-	a := ant{dir: dirUp}
-	a.r, a.c = rand.Intn(*gridSize-1), rand.Intn(*gridSize-1)
+	a := ant{dir: dirUp, r: *gridSize / 2, c: *gridSize / 2}
+	log.Infof("Ant starting at %s", a)
 
-	log.Infof("Starting at row: %d, column: %d", a.r, a.c)
 	g.iterate(&a)
 
 	fmt.Printf("End grid: \n%s", g)
