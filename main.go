@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -172,7 +173,6 @@ func init() {
 
 func main() {
 	flag.Parse()
-	log.Infof("Grid size: %d", *gridSize)
 
 	switch *logLevel {
 	case "info":
@@ -185,12 +185,15 @@ func main() {
 		log.Fatalf("invalid debug level %s. can be one of info, debug and fatal", *logLevel)
 	}
 
+	log.Infof("Grid size: %d", *gridSize)
+
 	g := make(grid, *gridSize)
 
 	for i, _ := range g {
 		g[i] = make([]bool, *gridSize)
 	}
 
+	rand.Seed(time.Now().Unix())
 	a := ant{dir: dirUp}
 	a.r, a.c = rand.Intn(*gridSize-1), rand.Intn(*gridSize-1)
 
